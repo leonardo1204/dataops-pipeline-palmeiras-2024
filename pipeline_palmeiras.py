@@ -20,15 +20,11 @@ s3_client = boto3.client(
 )
 
 def extrair_dados_reais(api_key):
-    """Busca os jogos do Palmeiras com diagnóstico de erro"""
-    print("⚽ Conectando à API-Football...")
+    """Busca os jogos do Palmeiras com lógica de resultado corrigida"""
+    print("⚽ Conectando à API-Football e processando resultados...")
     
     url = "https://v3.football.api-sports.io/fixtures"
-    
-  
-   # Buscando jogos do Palmeiras (121) no Brasileirão (71) de 2024
-
-    querystring = {"team": "121", "league": "71", "season": "2024"}
+    querystring = {"team": "121", "league": "71", "season": "2024"} 
     
     headers = {
         'x-rapidapi-host': "v3.football.api-sports.io",
@@ -38,26 +34,28 @@ def extrair_dados_reais(api_key):
     response = requests.get(url, headers=headers, params=querystring)
     res = response.json()
 
-    # PRINT DE DIAGNÓSTICO (O LOG) 
-    # Se der erro, isso vai dizer exatamente o porquê
-    if res.get('errors'):
-        print(f"❌ Erro da API: {res['errors']}")
-        return []
-    
-    print(f"📊 Jogos encontrados: {len(res.get('response', []))}")
-    # ------------------------------------
-
     jogos_reais = []
     for item in res.get('response', []):
-        # Tratamento para casos onde o placar ainda não aconteceu (null)
+        # 1. Identifica os gols
         gols_home = item['goals']['home'] if item['goals']['home'] is not None else 0
         gols_away = item['goals']['away'] if item['goals']['away'] is not None else 0
         
+        # 2. Identifica se o Palmeiras era Mandante ou Visitante
+        sou_mandante = item['teams']['home']['name'] == 'Palmeiras'
+        
+        # 3. Lógica de Resultado (O "Pulo do Gato")
+        if gols_home == gols_away:
+            resultado = "Empate"
+        elif sou_mandante:
+            resultado = "Vitoria" if gols_home > gols_away else "Derrota"
+        else:
+            resultado = "Vitoria" if gols_away > gols_home else "Derrota"
+            
         jogo = {
             "data": item['fixture']['date'][:10],
-            "adversario": item['teams']['away']['name'] if item['teams']['home']['name'] == 'Palmeiras' else item['teams']['home']['name'],
+            "adversario": item['teams']['away']['name'] if sou_mandante else item['teams']['home']['name'],
             "placar": f"{gols_home}-{gols_away}",
-            "resultado": "Vitoria" if (item['teams']['home']['name'] == 'Palmeiras' and gols_home > gols_away) else "A definir",
+            "resultado": resultado,
             "equipe": "Palmeiras"
         }
         jogos_reais.append(jogo)
